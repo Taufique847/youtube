@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>YouTube Farm - FINAL FIX</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0a; color: white; font-family: Arial; padding: 20px; }
+.container { max-width: 900px; margin: 0 auto; }
+h1 { color: #00a8ff; text-align: center; margin-bottom: 10px; }
+.sub { color: #888; text-align: center; margin-bottom: 20px; }
+
+.input-area { margin-bottom: 20px; }
+textarea { 
+  width: 100%; 
+  height: 100px; 
+  padding: 12px; 
+  background: #1a1a1a; 
+  color: white; 
+  border: 2px solid #333; 
+  border-radius: 8px; 
+  font-size: 14px;
+  resize: vertical;
+}
+
+.buttons { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; }
+.btn { 
+  padding: 12px 24px; 
+  border: none; 
+  border-radius: 6px; 
+  cursor: pointer; 
+  font-weight: bold;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.load { background: #0066ff; color: white; }
+.start { background: #00cc66; color: white; }
+.stop { background: #ff3333; color: white; }
+.test { background: #ffaa00; color: black; }
+.clear { background: #888; color: white; }
+
+.status-bar {
+  background: #1a1a1a;
+  padding: 15px;
+  border-radius: 8px;
+  margin: 20px 0;
+  display: flex;
+  justify-content: space-around;
+  border: 1px solid #333;
+}
+.stat { text-align: center; }
+.stat-label { color: #888; font-size: 12px; margin-bottom: 5px; }
+.stat-value { color: white; font-size: 18px; font-weight: bold; }
+
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.video-box {
+  background: #000;
+  border: 3px solid #333;
+  border-radius: 10px;
+  height: 220px; /* Height और बढ़ाई */
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+.video-box.playing { border-color: #00ff88; }
+.video-box.error { border-color: #ff3333; }
+
+.player-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.player-container iframe {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.box-num {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  z-index: 2;
+}
+
+.box-status {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  z-index: 2;
+}
+
+.box-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0,0,0,0.9);
+  color: white;
+  padding: 6px;
+  font-size: 11px;
+  display: flex;
+  justify-content: space-between;
+  z-index: 2;
+}
+
+.controls-row {
+  display: flex;
+  gap: 10px;
+  margin: 15px 0;
+  align-items: center;
+}
+.control-label { color: #888; font-size: 13px; }
+select {
+  padding: 8px 12px;
+  background: #1a1a1a;
+  color: white;
+  border: 1px solid #333;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.debug {
+  margin-top: 25px;
+  padding: 15px;
+  background: #111;
+  border-radius: 8px;
+  border: 1px solid #333;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+.debug-title { color: #888; margin-bottom: 10px; font-weight: bold; }
+.log { color: #00ff88; margin: 2px 0; }
+.error { color: #ff3333; margin: 2px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>✅ YouTube Farm - FINAL FIX</h1>
+  <div class="sub">YouTube वीडियो एक साथ चलाएं - कोई restart नहीं</div>
+  
+  <div class="input-area">
+    <textarea id="videoInput" placeholder="YouTube लिंक पेस्ट करें (एक लाइन में एक):
+उदाहरण (हमेशा काम करते हैं):
+https://www.youtube.com/watch?v=jNQXAC9IVRw
+https://youtu.be/9bZkp7q19f0
+https://youtu.be/dQw4w9WgXcQ
+
+Note: कुछ वीडियो में embedding disabled होता है"></textarea>
+  </div>
+  
+  <div style="background: #1a2b3c; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #00a8ff;">
+    <div style="color: #00a8ff; font-weight: bold; margin-bottom: 8px;">📌 कैसे उपयोग करें:</div>
+    <div style="color: #ccc; font-size: 13px; line-height: 1.5;">
+      1. <span style="color: #ffaa00; font-weight: bold;">QUICK TEST</span> क्लिक करें (पहले टेस्ट के लिए)<br>
+      2. YouTube लिंक पेस्ट करें<br>
+      3. <span style="color: #0066ff; font-weight: bold;">LOAD VIDEOS</span> क्लिक करें<br>
+      4. वीडियो चलने लगेगा<br>
+      <span style="color: #00ff88;">✅ सही height (220px) - वीडियो clear दिखेगा</span><br>
+      <span style="color: #00ff88;">✅ Simple YouTube embedding</span><br>
+      <span style="color: #00ff88;">✅ कोई complex checking नहीं</span>
+    </div>
+  </div>
+  
+  <div class="buttons">
+    <button class="btn load" id="loadBtn">📥 LOAD VIDEOS</button>
+    <button class="btn test" id="testBtn">🔧 QUICK TEST</button>
+    <button class="btn stop" id="stopBtn">⏹ STOP ALL</button>
+    <button class="btn clear" id="clearLogBtn">🧹 CLEAR LOG</button>
+  </div>
+  
+  <div class="controls-row">
+    <div class="control-label">Show boxes:</div>
+    <select id="boxCount">
+      <option value="1">1</option>
+      <option value="2" selected>2</option>
+      <option value="4">4</option>
+      <option value="8">8</option>
+    </select>
+  </div>
+  
+  <div class="status-bar">
+    <div class="stat">
+      <div class="stat-label">STATUS</div>
+      <div class="stat-value" id="status">Ready</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">PLAYING</div>
+      <div class="stat-value" id="playingCount">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">TOTAL TIME</div>
+      <div class="stat-value" id="totalTime">0:00</div>
+    </div>
+  </div>
+  
+  <div id="videoGrid" class="video-grid"></div>
+  
+  <div class="debug">
+    <div class="debug-title">DEBUG CONSOLE:</div>
+    <div id="debugLog"></div>
+  </div>
+</div>
+
+<script>
+// SUPER SIMPLE YouTube Farm - NO RESTART LOOP
+const YouTubeFarm = {
+  videoList: [],
+  players: [],
+  isPlaying: false,
+  playTimes: {},
+  
+  init() {
+    console.log("YouTube Farm: Initializing...");
+    this.createBoxes();
+    this.setupEvents();
+    setInterval(() => this.updateStats(), 1000);
+  },
+  
+  createBoxes() {
+    const grid = document.getElementById("videoGrid");
+    grid.innerHTML = "";
+    
+    for (let i = 0; i < 8; i++) {
+      const box = document.createElement("div");
+      box.className = "video-box";
+      box.id = `box-${i}`;
+      box.innerHTML = `
+        <div class="player-container" id="player-${i}"></div>
+        <div class="box-num">${i+1}</div>
+        <div class="box-status" id="status-${i}">Ready</div>
+        <div class="box-info">
+          <span id="time-${i}">0:00</span>
+          <span id="vid-${i}">—</span>
+        </div>
+      `;
+      grid.appendChild(box);
+      
+      this.players[i] = {
+        isActive: false,
+        playTime: 0,
+        status: document.getElementById(`status-${i}`),
+        time: document.getElementById(`time-${i}`),
+        vid: document.getElementById(`vid-${i}`),
+        box: box
+      };
+    }
+    this.updateBoxVisibility();
+  },
+  
+  updateBoxVisibility() {
+    const count = parseInt(document.getElementById("boxCount").value);
+    for (let i = 0; i < 8; i++) {
+      document.getElementById(`box-${i}`).style.display = i < count ? "block" : "none";
+    }
+  },
+  
+  setupEvents() {
+    document.getElementById("loadBtn").onclick = () => this.loadVideos();
+    document.getElementById("testBtn").onclick = () => this.test();
+    document.getElementById("stopBtn").onclick = () => this.stopAll();
+    document.getElementById("clearLogBtn").onclick = () => document.getElementById("debugLog").innerHTML = "";
+    document.getElementById("boxCount").onchange = () => this.updateBoxVisibility();
+    
+    // Remove the problematic START button listener
+    document.getElementById("videoInput").oninput = () => {
+      const text = document.getElementById("videoInput").value;
+      const lines = text.split("\n").filter(l => l.trim());
+      document.getElementById("status").textContent = `${lines.length} links ready`;
+    };
+  },
+  
+  getVideoId(url) {
+    url = url.trim();
+    if (/^[A-Za-z0-9_-]{11}$/.test(url)) return url;
+    
+    const patterns = [
+      /youtube\.com\/watch\?.*v=([A-Za-z0-9_-]{11})/,
+      /youtu\.be\/([A-Za-z0-9_-]{11})/,
+      /youtube\.com\/embed\/([A-Za-z0-9_-]{11})/
+    ];
+    
+    for (const p of patterns) {
+      const m = url.match(p);
+      if (m && m[1]) return m[1];
+    }
+    return null;
+  },
+  
+  loadVideos() {
+    const input = document.getElementById("videoInput").value.trim();
+    if (!input) {
+      alert("Please paste YouTube links first!");
+      return;
+    }
+    
+    this.videoList = [];
+    const lines = input.split("\n").filter(l => l.trim());
+    
+    for (const line of lines) {
+      const vid = this.getVideoId(line);
+      if (vid) {
+        this.videoList.push(vid);
+        this.log(`Found: ${vid}`);
+      }
+    }
+    
+    if (this.videoList.length === 0) {
+      alert("No valid YouTube links found!");
+      return;
+    }
+    
+    document.getElementById("status").textContent = `Loaded ${this.videoList.length} videos`;
+    this.log(`Loaded ${this.videoList.length} videos`);
+    
+    // Start videos automatically
+    this.startVideos();
+  },
+  
+  createPlayer(boxIndex, videoId) {
+    const playerDiv = document.getElementById(`player-${boxIndex}`);
+    if (!playerDiv) return;
+    
+    // Clear previous
+    playerDiv.innerHTML = "";
+    
+    const player = this.players[boxIndex];
+    if (!player) return;
+    
+    player.status.textContent = "Loading...";
+    player.vid.textContent = videoId.substring(0, 6);
+    player.box.className = "video-box";
+    
+    // SIMPLE DIRECT METHOD - YouTube iframe सीधे
+    // कोई complex checking नहीं
+    const iframe = document.createElement("iframe");
+    iframe.width = "100%";
+    iframe.height = "100%";
+    iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1`;
+    iframe.frameBorder = "0";
+    iframe.allow = "autoplay; fullscreen";
+    iframe.title = `YouTube video ${videoId}`;
+    iframe.style.border = "none";
+    
+    // SIMPLE event handling
+    iframe.onload = () => {
+      player.status.textContent = "Playing";
+      player.box.className = "video-box playing";
+      player.isActive = true;
+      this.updatePlayingCount();
+      this.log(`Box ${boxIndex+1}: Playing ${videoId}`);
+    };
+    
+    // SIMPLE error handling
+    iframe.onerror = () => {
+      player.status.textContent = "Error";
+      player.box.className = "video-box error";
+      this.log(`Box ${boxIndex+1}: Failed to load ${videoId}`);
+    };
+    
+    playerDiv.appendChild(iframe);
+  },
+  
+  startVideos() {
+    if (this.videoList.length === 0) return;
+    
+    this.isPlaying = true;
+    const boxCount = parseInt(document.getElementById("boxCount").value);
+    const toPlay = Math.min(boxCount, this.videoList.length);
+    
+    this.log(`Starting ${toPlay} videos`);
+    
+    // सभी बॉक्स clear करो और नए वीडियो लोड करो
+    for (let i = 0; i < toPlay; i++) {
+      const vid = this.videoList[i % this.videoList.length];
+      this.createPlayer(i, vid);
+    }
+  },
+  
+  stopAll() {
+    this.isPlaying = false;
+    for (let i = 0; i < 8; i++) {
+      const playerDiv = document.getElementById(`player-${i}`);
+      if (playerDiv) playerDiv.innerHTML = "";
+      
+      if (this.players[i]) {
+        this.players[i].isActive = false;
+        this.players[i].status.textContent = "Stopped";
+        this.players[i].box.className = "video-box";
+      }
+    }
+    document.getElementById("status").textContent = "Stopped";
+    document.getElementById("playingCount").textContent = "0";
+    this.log("All videos stopped");
+  },
+  
+  test() {
+    // Test videos - सिर्फ 1 वीडियो पहले टेस्ट के लिए
+    this.videoList = ["jNQXAC9IVRw"];
+    document.getElementById("videoInput").value = this.videoList.map(v => `https://youtu.be/${v}`).join('\n');
+    document.getElementById("status").textContent = "Test video loaded";
+    this.log("Test video: " + this.videoList.join(', '));
+    
+    // Auto-start test video
+    this.startVideos();
+  },
+  
+  updatePlayingCount() {
+    let count = 0;
+    for (const p of this.players) {
+      if (p && p.isActive) count++;
+    }
+    document.getElementById("playingCount").textContent = count;
+  },
+  
+  updateStats() {
+    let playingCount = 0;
+    for (const p of this.players) {
+      if (p && p.isActive) {
+        playingCount++;
+        p.playTime++;
+        const mins = Math.floor(p.playTime / 60);
+        const secs = p.playTime % 60;
+        p.time.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+      }
+    }
+    
+    if (playingCount > 0) {
+      let totalTime = 0;
+      for (const p of this.players) {
+        if (p && p.isActive) totalTime += p.playTime;
+      }
+      const totalMins = Math.floor(totalTime / 60);
+      const totalSecs = totalTime % 60;
+      document.getElementById("totalTime").textContent = `${totalMins}:${totalSecs.toString().padStart(2, '0')}`;
+    }
+    
+    document.getElementById("playingCount").textContent = playingCount;
+  },
+  
+
+  
+  log(msg) {
+    console.log(`[YT Farm] ${msg}`);
+    const logDiv = document.getElementById("debugLog");
+    const entry = document.createElement("div");
+    entry.className = "log";
+    entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    logDiv.appendChild(entry);
+    
+    while (logDiv.children.length > 10) {
+      logDiv.removeChild(logDiv.firstChild);
+    }
+    logDiv.scrollTop = logDiv.scrollHeight;
+  }
+};
+
+// Start when page loads
+window.onload = () => {
+  YouTubeFarm.init();
+  YouTubeFarm.log("System ready. Paste links and click LOAD VIDEOS.");
+  YouTubeFarm.log("Note: Some videos may not embed due to YouTube restrictions.");
+};
+</script>
+</body>
+</html>
