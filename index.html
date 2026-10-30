@@ -98,7 +98,7 @@ textarea {
 /* Video Grid */
 .video-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 15px;
   margin-top: 20px;
 }
@@ -279,12 +279,24 @@ jNQXAC9IVRw
   
   <!-- Controls -->
   <div class="controls-row">
-    <div class="control-label">Show boxes:</div>
+    <div class="control-label">Boxes:</div>
     <select id="boxCount">
       <option value="1">1</option>
       <option value="2">2</option>
       <option value="4" selected>4</option>
       <option value="8">8</option>
+      <option value="12">12</option>
+      <option value="16">16</option>
+      <option value="24">24</option>
+      <option value="32">32</option>
+      <option value="48">48</option>
+      <option value="64">64</option>
+      <option value="100">100</option>
+    </select>
+    <div class="control-label">Auto Boxes:</div>
+    <select id="autoBoxMode">
+      <option value="off">Manual</option>
+      <option value="on" selected>Auto (Based on Links)</option>
     </select>
     <div class="control-label">Loop Mode:</div>
     <select id="loopMode">
@@ -344,7 +356,10 @@ const YouTubeFarm = {
     const grid = document.getElementById("videoGrid");
     grid.innerHTML = "";
     
-    for (let i = 0; i < 8; i++) {
+    // Create maximum 100 boxes initially
+    const maxBoxes = 100;
+    
+    for (let i = 0; i < maxBoxes; i++) {
       const box = document.createElement("div");
       box.className = "video-box empty";
       box.id = `box-${i}`;
@@ -363,6 +378,7 @@ const YouTubeFarm = {
       this.players[i] = {
         isActive: false,
         playTime: 0,
+        totalCycles: 0,
         videoId: null,
         status: document.getElementById(`status-${i}`),
         time: document.getElementById(`time-${i}`),
@@ -376,15 +392,33 @@ const YouTubeFarm = {
   
   updateBoxVisibility() {
     const count = parseInt(document.getElementById("boxCount").value);
-    for (let i = 0; i < 8; i++) {
+    const boxCount = document.getElementById("autoBoxMode").value === "on" ? 
+                     Math.max(count, Math.ceil(this.videoList.length / 4) * 4) : count;
+    
+    for (let i = 0; i < this.players.length; i++) {
       const box = document.getElementById(`box-${i}`);
       if (box) {
-        box.style.display = i < count ? "block" : "none";
-        if (i >= count && this.players[i].isActive) {
+        box.style.display = i < boxCount ? "block" : "none";
+        if (i >= boxCount && this.players[i].isActive) {
           this.stopBox(i);
         }
       }
     }
+    this.log(`📊 Showing ${boxCount} boxes (Auto mode: ${document.getElementById("autoBoxMode").value})`);
+  },
+  
+  updateAutoBoxMode() {
+    const mode = document.getElementById("autoBoxMode").value;
+    if (mode === "on") {
+      // Auto-adjust boxes based on video count
+      const videoCount = this.videoList.length;
+      const neededBoxes = Math.ceil(videoCount / 4) * 4; // Multiple of 4 for grid
+      const maxBoxes = Math.min(100, Math.max(4, neededBoxes));
+      
+      document.getElementById("boxCount").value = maxBoxes;
+      this.log(`🤖 Auto mode: ${videoCount} videos → ${maxBoxes} boxes`);
+    }
+    this.updateBoxVisibility();
   },
   
   setupEvents() {
@@ -404,6 +438,9 @@ const YouTubeFarm = {
     // Controls
     document.getElementById("boxCount").onchange = () => this.updateBoxVisibility();
     document.getElementById("loopMode").onchange = () => this.log(`Loop mode: ${document.getElementById("loopMode").value}`);
+    document.getElementById("autoBoxMode").onchange = () => {
+      this.updateAutoBoxMode();
+    };
     
     // Box control buttons (delegated event)
     document.getElementById("videoGrid").onclick = (e) => {
@@ -445,30 +482,59 @@ const YouTubeFarm = {
       return;
     }
     
-    // Find empty box
-    const boxCount = parseInt(document.getElementById("boxCount").value);
+    // Find empty box - search through ALL boxes (not just visible ones)
     let emptyBoxIndex = -1;
     
-    for (let i = 0; i < boxCount; i++) {
-      if (!this.players[i].isActive && this.players[i].status.textContent === "Empty") {
+    // First, search for truly empty boxes
+    for (let i = 0; i < this.players.length; i++) {
+      const player = this.players[i];
+      if (!player.isActive) {
         emptyBoxIndex = i;
         break;
       }
     }
     
     if (emptyBoxIndex === -1) {
-      // No empty box, add to video list for next available
-      this.videoList.push(videoId);
-      this.log(`📥 Video added to queue: ${videoId}`);
-      this.updateTotalVideos();
-      document.getElementById("singleVideoInput").value = "";
-      return;
+      // No empty box found in existing players, create a new one if possible
+      // First, check if we can increase box count
+      const currentBoxCount = parseInt(document.getElementById("boxCount").value);
+      const autoBoxMode = document.getElementById("autoBoxMode").value;
+      
+      if (autoBoxMode === "on" && currentBoxCount < 100) {
+        // Increase box count and add to video list
+        const newCount = Math.min(100, currentBoxCount + 4); // Add in groups of 4
+        document.getElementById("boxCount").value = newCount;
+        this.updateBoxVisibility();
+        
+        // The new box will be empty, find it
+        for (let i = currentBoxCount; i < newCount; i++) {
+          if (!this.players[i].isActive) {
+            emptyBoxIndex = i;
+            break;
+          }
+        }
+      }
+      
+      if (emptyBoxIndex === -1) {
+        // No empty box, add to video list
+        this.videoList.push(videoId);
+        this.log(`📥 Video added to queue: ${videoId}`);
+        this.updateTotalVideos();
+        document.getElementById("singleVideoInput").value = "";
+        return;
+      }
     }
     
     // Play in empty box
     this.playInBox(emptyBoxIndex, videoId);
     document.getElementById("singleVideoInput").value = "";
     this.log(`✅ Playing in Box ${emptyBoxIndex+1}: ${videoId}`);
+    
+    // Add to video list as well for tracking
+    if (!this.videoList.includes(videoId)) {
+      this.videoList.push(videoId);
+      this.updateTotalVideos();
+    }
   },
   
   submitSingleVideo() {
@@ -581,6 +647,7 @@ const YouTubeFarm = {
     player.vid.textContent = "—";
     player.time.textContent = "0:00";
     player.playTime = 0;
+    player.totalCycles = 0;
     
     delete this.playerInstances[boxIndex];
     this.updatePlayingCount();
@@ -613,6 +680,11 @@ const YouTubeFarm = {
     this.log(`📥 Loaded ${this.videoList.length} videos`);
     this.updateTotalVideos();
     
+    // Update auto-box mode if enabled
+    if (document.getElementById("autoBoxMode").value === "on") {
+      this.updateAutoBoxMode();
+    }
+    
     // Start videos
     this.startVideos();
   },
@@ -626,9 +698,9 @@ const YouTubeFarm = {
     
     this.log(`🎬 Starting ${toPlay} videos`);
     
-    // Play in empty boxes
+    // Play in empty boxes - check all 100 boxes
     let videoIndex = 0;
-    for (let i = 0; i < boxCount && videoIndex < this.videoList.length; i++) {
+    for (let i = 0; i < this.players.length && videoIndex < this.videoList.length; i++) {
       if (!this.players[i].isActive) {
         this.playInBox(i, this.videoList[videoIndex]);
         videoIndex++;
@@ -640,7 +712,7 @@ const YouTubeFarm = {
   
   stopAll() {
     this.isPlaying = false;
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < this.players.length; i++) {
       this.stopBox(i);
     }
     document.getElementById("status").textContent = "Stopped";
@@ -667,39 +739,73 @@ const YouTubeFarm = {
   },
   
   updateTotalVideos() {
-    document.getElementById("totalVideos").textContent = this.videoList.length;
+    // Count videos currently playing
+    let playingCount = 0;
+    for (let i = 0; i < this.players.length; i++) {
+      if (this.players[i] && this.players[i].isActive) {
+        playingCount++;
+      }
+    }
+    
+    // Show format: "X playing / Y total"
+    document.getElementById("totalVideos").textContent = 
+      `${playingCount} playing / ${this.videoList.length} total`;
   },
   
   updateStats() {
     let playingCount = 0;
     let totalTime = 0;
+    let videosPlaying = 0;
     
-    for (const p of this.players) {
+    for (let i = 0; i < this.players.length; i++) {
+      const p = this.players[i];
       if (p && p.isActive) {
         playingCount++;
-        p.playTime++;
-        totalTime += p.playTime;
+        videosPlaying++;
+        
+        // Only increment playTime if video is actually playing
+        if (p.status.textContent.includes("Playing")) {
+          p.playTime++;
+          totalTime += p.playTime;
+        }
         
         const mins = Math.floor(p.playTime / 60);
         const secs = p.playTime % 60;
         p.time.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
         
-        // Auto-restart logic (simplified)
+        // Auto-restart logic - preserve total time
         if (p.playTime > 60 && document.getElementById("loopMode").value === 'auto') {
-          // Simulate auto-restart every 60 seconds
-          p.playTime = 0;
-          this.log(`🔄 Box ${this.players.indexOf(p)+1}: Auto-restarting`);
+          // Keep track of total cycles for accurate time calculation
+          if (!p.totalCycles) p.totalCycles = 0;
+          p.totalCycles++;
+          
+          // Display restart message but DON'T reset playTime
+          this.log(`🔄 Box ${i+1}: Loop ${p.totalCycles} completed (time: ${p.playTime}s)`);
         }
       }
     }
     
+    // Update stats display
+    document.getElementById("playingCount").textContent = playingCount;
+    
+    // Count total videos currently playing (not just in queue)
+    let totalVideosPlaying = 0;
+    for (let i = 0; i < this.players.length; i++) {
+      if (this.players[i] && this.players[i].isActive) {
+        totalVideosPlaying++;
+      }
+    }
+    
+    // Show both: videos in queue + videos currently playing
+    document.getElementById("totalVideos").textContent = 
+      `${totalVideosPlaying} playing / ${this.videoList.length} total`;
+    
+    // Calculate and display total time
     if (playingCount > 0) {
       const totalMins = Math.floor(totalTime / 60);
       const totalSecs = totalTime % 60;
       document.getElementById("totalTime").textContent = `${totalMins}:${totalSecs.toString().padStart(2, '0')}`;
     }
-    
-    document.getElementById("playingCount").textContent = playingCount;
   },
   
   log(msg) {
